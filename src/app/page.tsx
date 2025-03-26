@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download } from "lucide-react";
+import { Timer, Download, Pause } from "lucide-react";
 
 type Activity = 'moving' | 'traffic' | 'dwelling' | null;
 type TimeEntry = {
@@ -68,6 +68,67 @@ export default function Home() {
     }
   };
 
+  const formatTimeForCSV = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDuration = (startTime: number, endTime: number): string => {
+    const duration = endTime - startTime;
+    const minutes = Math.floor(duration / 60000);
+    const seconds = Math.floor((duration % 60000) / 1000);
+    const milliseconds = duration % 1000;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+  };
+
+  const exportToCSV = async () => {
+    const headers = ['activity_type', 'start_time', 'end_time', 'duration'];
+    const rows = timeEntries.map(entry => {
+      const endTime = entry.endTime || Date.now();
+      const duration = formatDuration(entry.startTime, endTime);
+      return `${entry.activity},${formatTimeForCSV(entry.startTime)},${formatTimeForCSV(endTime)},${duration}`;
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const fileName = `bus-timing-${new Date().toISOString().split('T')[0]}.csv`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+
+    try {
+      // Check if the browser supports the Native Share API and files sharing
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'text/csv' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Bus Timing Data',
+            text: 'Export of bus timing data'
+          });
+          return;
+        }
+      }
+
+      // Fallback for desktop or when share API is not available
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      // Fallback method for iOS Safari and other browsers
+      window.location.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    }
+  };
+
   const calculateDurations = () => {
     const durations = {
       moving: 0,
@@ -89,44 +150,6 @@ export default function Home() {
       traffic: (durations.traffic / total * 100).toFixed(1),
       dwelling: (durations.dwelling / total * 100).toFixed(1)
     };
-  };
-
-  const formatTimeForCSV = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDuration = (startTime: number, endTime: number): string => {
-    const duration = endTime - startTime;
-    const minutes = Math.floor(duration / 60000);
-    const seconds = Math.floor((duration % 60000) / 1000);
-    const milliseconds = duration % 1000;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
-  };
-
-  const exportToCSV = () => {
-    const headers = ['activity_type', 'start_time', 'end_time', 'duration'];
-    const rows = timeEntries.map(entry => {
-      const endTime = entry.endTime || Date.now();
-      const duration = formatDuration(entry.startTime, endTime);
-      return `${entry.activity},${formatTimeForCSV(entry.startTime)},${formatTimeForCSV(endTime)},${duration}`;
-    });
-
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bus-timing-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
   };
 
   const durations = calculateDurations();
