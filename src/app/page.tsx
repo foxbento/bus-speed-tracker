@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Timer, Download, Pause } from "lucide-react";
+import { Download } from "lucide-react";
 
 type Activity = 'moving' | 'traffic' | 'dwelling' | null;
 type TimeEntry = {
